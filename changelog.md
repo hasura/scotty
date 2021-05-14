@@ -1,3 +1,9 @@
+## Unreleased
+
+* Added `ScottyT'`, which is a transformer
+* (Breaking) `ScottyT` is now a type synonym of `ScottyT'`
+* `middleware` now requires a `Monad` constraint
+
 ## next [????.??.??]
 
 ## 0.12.1 [2022.11.17]

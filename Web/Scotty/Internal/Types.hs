@@ -22,7 +22,7 @@ import           Control.Monad.Error.Class
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO)
 import           Control.Monad.Reader (MonadReader(..), ReaderT, mapReaderT)
-import           Control.Monad.State.Strict (MonadState(..), State, StateT, mapStateT)
+import           Control.Monad.State.Strict (MonadState(..), StateT, mapStateT)
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Control (MonadBaseControl, StM, liftBaseWith, restoreM, ComposeSt, defaultLiftBaseWith, defaultRestoreM, MonadTransControl, StT, liftWith, restoreT)
 import           Control.Monad.Trans.Except
@@ -94,9 +94,13 @@ updateMaxRequestBodySize RouteOptions { .. } s@ScottyState { routeOptions = ro }
     let ro' = ro { maxRequestBodySize = maxRequestBodySize }
     in s { routeOptions = ro' }
 
-newtype ScottyT e m a = ScottyT { runS :: State (ScottyState e m) a }
-    deriving ( Functor, Applicative, Monad )
+-- | The Scotty monad transformer is a DSL for writing routes.
+-- The type parameter @m@ indicates the underlying monad of `ActionM`,
+-- and @n@ is the underlying monad of `ScottyT` itself.
+newtype ScottyT' e m n a = ScottyT { runS :: StateT (ScottyState e m) n a }
+    deriving ( Functor, Applicative, Monad, MonadTrans )
 
+type ScottyT e m = ScottyT' e m m
 
 ------------------ Scotty Errors --------------------
 data ActionError e
@@ -234,7 +238,7 @@ instance (MonadState s m, ScottyError e) => MonadState s (ActionT e m) where
     {-# INLINE put #-}
     put = lift . put
 
-instance (Semigroup a) => Semigroup (ScottyT e m a) where
+instance (Semigroup a, Monad m) => Semigroup (ScottyT e m a) where
   x <> y = (<>) <$> x <*> y
 
 instance
@@ -242,9 +246,7 @@ instance
 #if !(MIN_VERSION_base(4,11,0))
   , Semigroup a
 #endif
-#if !(MIN_VERSION_base(4,8,0))
-  , Functor m
-#endif
+  , Monad m
   ) => Monoid (ScottyT e m a) where
   mempty = return mempty
 #if !(MIN_VERSION_base(4,11,0))
