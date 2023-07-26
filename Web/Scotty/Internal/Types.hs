@@ -21,6 +21,7 @@ import           Control.Monad.Catch (MonadCatch, catch, MonadThrow, throwM)
 import           Control.Monad.Error.Class
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO)
+import           Control.Monad.Morph (MFunctor, hoist)
 import           Control.Monad.Reader (MonadReader(..), ReaderT, mapReaderT)
 import           Control.Monad.State.Strict (MonadState(..), StateT, mapStateT)
 import           Control.Monad.Trans.Class (MonadTrans(..))
@@ -98,7 +99,7 @@ updateMaxRequestBodySize RouteOptions { .. } s@ScottyState { routeOptions = ro }
 -- The type parameter @m@ indicates the underlying monad of `ActionM`,
 -- and @n@ is the underlying monad of `ScottyT` itself.
 newtype ScottyT' e m n a = ScottyT { runS :: StateT (ScottyState e m) n a }
-    deriving ( Functor, Applicative, Monad, MonadTrans )
+    deriving ( Functor, Applicative, Monad, MonadTrans, MonadIO )
 
 type ScottyT e m = ScottyT' e m m
 
@@ -166,6 +167,9 @@ instance Default ScottyResponse where
 
 newtype ActionT e m a = ActionT { runAM :: ExceptT (ActionError e) (ReaderT ActionEnv (StateT ScottyResponse m)) a }
     deriving ( Functor, Applicative, MonadIO )
+
+instance MFunctor (ActionT e) where
+      hoist nat (ActionT m) = ActionT (hoist (hoist (hoist nat)) m)
 
 instance (Monad m, ScottyError e) => Monad.Monad (ActionT e m) where
     return = pure
